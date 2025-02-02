@@ -4,6 +4,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+from qgis.PyQt.QtWidgets import QProgressBar
+from qgis.PyQt.QtCore import QCoreApplication
+from qgis.core import Qgis
+from qgis.utils import iface
+
+
 # TODO: Either remove this or get it working - it seems like it was messing things up.
 def install_duckdb_extensions():
     try:
@@ -46,17 +52,36 @@ def ensure_duckdb():
                 py_path = next((path for path in possible_paths if os.path.exists(path)), sys.executable)
             else:
                 py_path = sys.executable
+
+            msg_bar = iface.messageBar()
+            progress = QProgressBar()
+
+            # Set progress bar to be infinite
+            progress.setMinimum(0)
+            progress.setMaximum(0)
+            progress.setValue(0)
+
+            msg = msg_bar.createMessage("Installing DuckDB...")
+            msg.layout().addWidget(progress)
+            msg_bar.pushWidget(msg)
+            QCoreApplication.processEvents()
+
             subprocess.check_call([py_path, "-m", "pip", "install", "--user", "duckdb"])
-            
+
+            msg_bar.clearWidgets()
+
             # Force Python to reload all modules to pick up the new installation
             import importlib
             importlib.invalidate_caches()
             
             # Try importing again
             import duckdb
+            msg_bar.pushSuccess("Success", f"DuckDB {duckdb.__version__} installed successfully")
             print(f"DuckDB {duckdb.__version__} installed successfully")
             return True; #install_duckdb_extensions()
         except Exception as e:
+            msg_bar.clearWidgets()
+            msg_bar.pushWarning("Error", f"Failed to install/upgrade DuckDB")
             print(f"Failed to install/upgrade DuckDB: {str(e)}")
             return False
 
